@@ -14,7 +14,7 @@
 
 
 
-struct list_head g_process_head= LIST_HEAD_INIT(g_process_head);
+static struct list_head g_process_head= LIST_HEAD_INIT(g_process_head);
 
 
 int check_proc(struct process_info* proc_dest)
@@ -115,7 +115,7 @@ int get_proc(struct list_head* ghead,char* file)
 		list_add(&p->list,ghead);
 		line_num++;
 		printf("%d: %s\n",line_num,line);
-		memset(line,0,256);
+		memset(line,0,MAX_SIZE);
 	}
 	fclose(fp);
 	return line_num;
