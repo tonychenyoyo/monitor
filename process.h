@@ -1,16 +1,10 @@
-//process.h
 #ifndef _PROCESS_H_
 #define _PROCESS_H_
 #define PROCES "/proc"
-#define MAX_PROC_NAME 128
-#define MAX_CMD_LINE 256
-#define PROC_STATUS 6
-#define INVALID_INTEGER -1
-#define INVALID_ULONG 0
-#define INVALID_DOUBLE 0
+#define MAX_SIZE 256
 #define DEBUG 0
-#define SIZE 1024
 
+#include "vns_list.h"
 
 #if DEBUG
 #define myprintf(fmt, args...)    printf("%s,%s(),%d:" fmt "\n", __FILE__,__FUNCTION__,__LINE__, ##args)
@@ -19,17 +13,20 @@
 #endif
 
 
+
 //进程结构体定义
-struct proc_struct
+struct process_info
 {
- 	char name[MAX_PROC_NAME];
- 	char cmdline[MAX_CMD_LINE];
+ 	char name[MAX_SIZE];//进程名字
+ 	char cmdline[MAX_SIZE];//命令行，执行命令字符串
  	int pid;
+	struct list_head list;
 };
-int check_proc(struct proc_struct* array);
-int proc_find(struct proc_struct* proc1,struct proc_struct* proc);
-int get_proc(struct proc_struct* array, int size, char* file);
-int startProc(struct proc_struct* proc,struct proc_struct *must_run_proc,int must_run_size);
+
+int check_proc(struct process_info* array);
+int proc_find(struct process_info* src,struct process_info* dest);
+int get_proc(struct list_head* ghead, char* file);
+int startProc(struct process_info* proc);
 int creat_and_run_moniter(char *file);
 static  int IsDigit(char a[]);
 #endif
