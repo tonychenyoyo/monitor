@@ -11,10 +11,27 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include "vns_list.h"
-
-
+#include "lib/iniparser.h"
 
 static struct list_head g_process_head= LIST_HEAD_INIT(g_process_head);
+
+static  int IsDigit(char a[])
+{
+        int size,i;
+
+        size = strlen(a);
+	
+        if(size == 0) return 0;
+	
+        for(i = 0; i< size; i++)
+        {
+          if(a[i] <'0' || a[i] > '9')
+           {
+             return 0;
+           }
+        }
+        return 1;
+}
 
 
 int check_proc(struct process_info* proc_dest)
@@ -37,8 +54,10 @@ int check_proc(struct process_info* proc_dest)
 	{
 		char data[30]={0};
 		sprintf(data, "%s", dirp->d_name); 
-		if((IsDigit(data)))
+		
+		if(IsDigit(data))
 		{
+			printf("%s, ",data);
 			proc_src = (struct process_info *)(malloc(sizeof(struct process_info)));
 			//tmp = proc_src;                    
 			proc_src->pid = atoi(dirp->d_name);//pid找出来
@@ -49,9 +68,12 @@ int check_proc(struct process_info* proc_dest)
 			free(proc_src);   
 		}
 	}
+//	printf("\n");
 
 	
 }
+
+//比较系统的进程和目标进程，SRC指代系统实时进程
 int proc_find(struct process_info* src, struct process_info* dest)
 {
     char buffer[MAX_SIZE*10], *p, cmd[MAX_SIZE];
@@ -84,41 +106,53 @@ int proc_find(struct process_info* src, struct process_info* dest)
     }
     return (strcmp(src->name, dest->name) == 0)? 1 : 0;
 }
-int get_process_cmdline()
+
+//遍历链表，目前仅用于调试
+void traverse(struct list_head* ghead)
 {
-	
+	struct list_head* pos;
+	struct list_head* n;
+	struct process_info *proc;
+	list_for_each_safe(pos,n,ghead)
+	{
+			proc=list_entry(pos,struct process_info,list);
+			printf("%s ,%s\n",proc->name,proc->cmdline);
+	}
 }
 
- int  get_process_name()
-{
-	
-}
+
+ 
+//把配置文件上的监控进程填入链表中，
 int get_proc(struct list_head* ghead,char* file)
 {
-	char line[MAX_SIZE]={0};
-	FILE* fp = fopen(file, "r");
-	if(!fp) 
+	int i;
+	dictionary	*	d ;
+	d=iniparser_load(file);
+	//dictionary_dump(ini,stdout);
+	for (i=0 ; i<d->size ; i++) 
 	{
-	 	printf("open file %s fail\n", file);
-	 	return 0;
-	}
-	int line_num=0;
-	while(fgets(line,MAX_SIZE,fp))
-	{
-		struct process_info *p=(struct process_info*)malloc(sizeof(struct process_info));
-		if(p==NULL)
+	        if (d->key[i]&&d->val[i]) 
 		{
-			printf("malloc process_info fail\n");
-		}
-		get_process_cmdline(line);
-		get_process_name(line);
-		list_add(&p->list,ghead);
-		line_num++;
-		printf("%d: %s\n",line_num,line);
-		memset(line,0,MAX_SIZE);
+			struct process_info *p=(struct process_info*)malloc(sizeof(struct process_info));
+			if(p==NULL)
+			{
+				printf("malloc process_info fail\n");
+			}
+
+			memset(p,0,sizeof(struct process_info));
+		
+			memcpy(p->name,d->key[i],strlen(d->key[i]));
+			memcpy(p->cmdline,d->val[i],strlen(d->val[i]));
+			printf("====================\n");
+			//printf("%s ,%s\n",p->name,p->cmdline);
+			
+			list_add(&p->list,ghead);
+
+			traverse(ghead);
+	                   
+	        }
 	}
-	fclose(fp);
-	return line_num;
+	
 }
 
 
@@ -136,32 +170,17 @@ int startProc(struct process_info* proc)
 	}
 	pclose(fp);
 	return 1;
-	/*
-	int pid = fork();
-	if(pid == 0)
-	{
-		if(execl((char *)proc->cmdline, (char *)proc->name, NULL)<0)
-		{
-			printf("run %s fail\n",(char *)proc->cmdline);
-			return 0;
-		}
-	}
-	else
-	{
-		wait(NULL);
-	}
-	*/
-	
+
 }
 
-int moniter_run(struct list_head *ghead)
+int moniter_process(struct list_head *ghead)
 {
 
 	struct list_head* pos;
 	struct list_head* n;
 	struct process_info *proc;
-
-	list_for_each_safe(pos,n,&g_process_head)
+//遍历配置文件中需要监控的进程
+	list_for_each_safe(pos,n,ghead)
 	{
 			proc=list_entry(pos,struct process_info,list);
 			if(check_proc(proc)<=0)//这个程序没有在运行
@@ -189,7 +208,7 @@ void exit_proc(int ar)
 
 }
 
-static void* run_moniter(void *data)
+void* run_moniter(void *data)
 {
 	int must_run_size;
 	must_run_size=get_proc(&g_process_head,data);
@@ -197,48 +216,17 @@ static void* run_moniter(void *data)
 	{
 		return 0;
 	}
+	/*
 	struct sigaction act, oldact;
 	act.sa_handler = exit_proc;
 	act.sa_flags = SA_ONESHOT;
 	sigaction(SIGTERM, &act, NULL);
 	sigaction(SIGINT, &act, NULL);
 	sigaction(SIGHUP, &act, NULL);
-	moniter_run(&g_process_head);
+	*/
+	moniter_process(&g_process_head);
 	return NULL;
 }
 
-int creat_and_run_moniter(char *file)
-{
-
-	pthread_t moniter_thread;
-	if(pthread_create(&moniter_thread, NULL, run_moniter, file) == 0)
-	{
-		printf("thread create Ok, check thread start \n");
-		return 0;
-	}
-	else
-	{
-		printf("thread check create Err\n");
-		return -1;
-	}
-}
-
-static  int IsDigit(char a[])
-{
-        int size,i;
-
-        size = strlen(a);
-	
-        if(size == 0) return 0;
-	
-        for(i = 0; i< size; i++)
-        {
-          if(a[i] <'0' || a[i] > '9')
-           {
-             return 0;
-           }
-        }
-        return 1;
-}
 
 

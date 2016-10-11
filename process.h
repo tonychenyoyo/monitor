@@ -27,7 +27,6 @@ int check_proc(struct process_info* array);
 int proc_find(struct process_info* src,struct process_info* dest);
 int get_proc(struct list_head* ghead, char* file);
 int startProc(struct process_info* proc);
-int creat_and_run_moniter(char *file);
-static  int IsDigit(char a[]);
+void* run_moniter(void *data);
 #endif
 

@@ -9,13 +9,25 @@
 
 int main(void)
 {
-	creat_and_run_moniter("proclist.ini");
-	
+
+	char *file="proclist.ini";
+	pthread_t moniter_thread;
+	if(pthread_create(&moniter_thread, NULL, run_moniter, file) == 0)
+	{
+		printf("thread create Ok, check thread start \n");
+		return 0;
+	}
+	else
+	{
+		printf("thread check create Err\n");
+		return -1;
+	}
+
 	while(1)
 	{
 		sleep(1);
 	}
 	
-    return 1;
+    return 0;
 }
 
